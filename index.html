@@ -208,7 +208,7 @@
 <canvas id="stars-canvas"></canvas>
 <div class="vignette"></div>
 
-<audio id="bgm" loop><source src="bgm.mp3" type="audio/mpeg"></audio>
+
 
 <!-- Discord Popup -->
 <div class="popup-overlay" id="disc-overlay">
@@ -384,29 +384,48 @@ copyBtn.addEventListener('click', () => {
 });
 
 // ── PLAYER ──
-const audio = document.getElementById('bgm');
+const audio = new Audio('bgm.mp3');
+audio.loop = true;
+audio.preload = 'auto';
+
 const bplay = document.getElementById('bplay');
 const picon = document.getElementById('picon');
 const pf    = document.getElementById('pf');
 const ct    = document.getElementById('ct');
 const dt    = document.getElementById('dt');
 const pb    = document.getElementById('pb');
+const trackName = document.querySelector('.track-name');
 let playing = false;
 const PLAY  = 'M8 5v14l11-7z';
 const PAUSE = 'M6 19h4V5H6v14zm8-14v14h4V5h-4z';
-function fmt(s) { if(isNaN(s)) return '0:00'; const m=Math.floor(s/60),sec=Math.floor(s%60); return `${m}:${sec<10?'0':''}${sec}`; }
+function fmt(s) { if(!s||isNaN(s)) return '0:00'; const m=Math.floor(s/60),sec=Math.floor(s%60); return `${m}:${sec<10?'0':''}${sec}`; }
+
 bplay.addEventListener('click', () => {
-  playing ? audio.pause() : audio.play().catch(()=>{});
-  playing = !playing;
-  picon.innerHTML = `<path d="${playing ? PAUSE : PLAY}"/>`;
+  if (playing) {
+    audio.pause();
+    playing = false;
+    picon.innerHTML = `<path d="${PLAY}"/>`;
+  } else {
+    audio.play().then(() => {
+      playing = true;
+      picon.innerHTML = `<path d="${PAUSE}"/>`;
+    }).catch(() => {
+      trackName.textContent = 'bgm.mp3 not found';
+    });
+  }
 });
+
 audio.addEventListener('timeupdate', () => {
   if (!audio.duration) return;
   pf.style.width = (audio.currentTime / audio.duration * 100) + '%';
   ct.textContent = fmt(audio.currentTime);
 });
 audio.addEventListener('loadedmetadata', () => { dt.textContent = fmt(audio.duration); });
+audio.addEventListener('error', () => { trackName.textContent = 'bgm.mp3 not found'; });
+audio.addEventListener('ended', () => { playing = false; picon.innerHTML = `<path d="${PLAY}"/>`; });
+
 pb.addEventListener('click', e => {
+  if (!audio.duration) return;
   const r = pb.getBoundingClientRect();
   audio.currentTime = ((e.clientX - r.left) / r.width) * audio.duration;
 });
