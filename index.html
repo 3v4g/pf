@@ -1,0 +1,417 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Raymond</title>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;700&display=swap" rel="stylesheet"/>
+  <style>
+    *, *::before, *::after { margin:0; padding:0; box-sizing:border-box; }
+
+    /* ── CURSOR: dot only ── */
+    * { cursor: none !important; }
+    #cur-dot {
+      position:fixed; z-index:9999; pointer-events:none;
+      width:6px; height:6px; border-radius:50%;
+      background:#fff;
+      transform:translate(-50%,-50%);
+      transition: opacity .1s;
+    }
+
+    /* ── BASE ── */
+    html, body { width:100%; height:100%; overflow:hidden; }
+    body {
+      font-family:'Inter', sans-serif;
+      background:#000;
+      color:#fff;
+      display:flex; align-items:center; justify-content:center;
+    }
+
+    /* ── STARS ── */
+    #stars-canvas { position:fixed; inset:0; z-index:0; }
+
+    /* ── VIGNETTE ── */
+    .vignette {
+      position:fixed; inset:0; z-index:1;
+      background: radial-gradient(ellipse at center, transparent 25%, rgba(0,0,0,0.82) 100%);
+      pointer-events:none;
+    }
+
+    /* ── CARD ── */
+    .card {
+      position:relative; z-index:2;
+      display:flex; flex-direction:column;
+      align-items:center;
+    }
+
+    /* ── WEAPON ── */
+    .weapon-wrap {
+      margin-bottom:-6px;
+      animation: float 6s ease-in-out infinite;
+      filter: drop-shadow(0 10px 30px rgba(255,255,255,0.07));
+    }
+    @keyframes float {
+      0%,100% { transform:translateY(0) rotate(-5deg); }
+      50%      { transform:translateY(-16px) rotate(-5deg); }
+    }
+
+    /* ── NAME ── */
+    .name-wrap {
+      display:flex; align-items:center;
+      font-family:'JetBrains Mono', monospace;
+      font-weight:700; font-size:2.8rem;
+      letter-spacing:-.02em;
+      margin-bottom:8px;
+    }
+    #typed-name { color:#fff; }
+    .blink {
+      display:inline-block; width:3px; height:2.4rem;
+      background:#fff; border-radius:2px; margin-left:4px;
+      vertical-align:middle;
+      animation: blink .75s step-end infinite;
+    }
+    @keyframes blink { 0%,100%{opacity:1} 50%{opacity:0} }
+
+    /* ── LOCATION ── */
+    .location {
+      display:flex; align-items:center; gap:5px;
+      font-size:.72rem; color:rgba(255,255,255,0.38);
+      letter-spacing:.07em; margin-bottom:20px;
+    }
+
+    /* ── ICONS ── */
+    .icons-row {
+      display:flex; align-items:center; gap:10px;
+      margin-bottom:30px;
+    }
+    .icon-pill {
+      width:46px; height:46px; border-radius:50%;
+      background:rgba(255,255,255,0.05);
+      border:1px solid rgba(255,255,255,0.08);
+      backdrop-filter:blur(12px);
+      display:flex; align-items:center; justify-content:center;
+      transition:background .2s, transform .2s;
+    }
+    .icon-pill:hover { background:rgba(255,255,255,0.12); transform:translateY(-3px); }
+    .icon-pill svg { width:20px; height:20px; }
+    a.icon-pill { text-decoration:none; }
+
+    /* ── DISCORD POPUP ── */
+    .popup-overlay {
+      position:fixed; inset:0; z-index:100;
+      display:flex; align-items:center; justify-content:center;
+      background:rgba(0,0,0,0.55);
+      backdrop-filter:blur(6px);
+      opacity:0; pointer-events:none;
+      transition:opacity .2s;
+    }
+    .popup-overlay.open { opacity:1; pointer-events:all; }
+    .popup-box {
+      background:#0e0e0e;
+      border:1px solid rgba(255,255,255,0.1);
+      border-radius:18px;
+      padding:28px 36px;
+      display:flex; flex-direction:column; align-items:center; gap:14px;
+      position:relative;
+      transform:scale(.92);
+      transition:transform .2s;
+      box-shadow:0 30px 80px rgba(0,0,0,0.8);
+    }
+    .popup-overlay.open .popup-box { transform:scale(1); }
+    .popup-close {
+      position:absolute; top:12px; right:14px;
+      background:none; border:none; color:rgba(255,255,255,0.35);
+      font-size:1.1rem; line-height:1;
+      transition:color .15s;
+    }
+    .popup-close:hover { color:#fff; }
+    .popup-disc-icon svg { width:36px; height:36px; }
+    .popup-label {
+      font-size:.68rem; letter-spacing:.12em; text-transform:uppercase;
+      color:rgba(255,255,255,0.3);
+    }
+    .popup-user {
+      font-family:'JetBrains Mono', monospace;
+      font-size:1.25rem; font-weight:700; color:#fff;
+      letter-spacing:.02em;
+    }
+    .copy-tag {
+      margin-top:2px;
+      padding:.45rem 1.2rem;
+      background:rgba(88,101,242,0.15);
+      border:1px solid rgba(88,101,242,0.35);
+      border-radius:8px;
+      color:#7983f5; font-size:.72rem;
+      font-family:'Inter', sans-serif; letter-spacing:.05em;
+      transition:background .2s, color .2s;
+    }
+    .copy-tag:hover { background:#5865F2; color:#fff; border-color:#5865F2; }
+    .copy-tag.ok { background:#22c55e; border-color:#22c55e; color:#fff; }
+
+    /* ── PLAYER ── */
+    .player {
+      width:330px;
+      background:rgba(8,8,8,0.75);
+      border:1px solid rgba(255,255,255,0.07);
+      border-radius:16px; padding:14px 16px;
+      backdrop-filter:blur(24px);
+      box-shadow:0 24px 60px rgba(0,0,0,0.7);
+    }
+    .player-top {
+      display:flex; align-items:center; gap:12px; margin-bottom:12px;
+    }
+    .album-art {
+      width:46px; height:46px; border-radius:8px; flex-shrink:0;
+      background:linear-gradient(135deg,#111,#1e1e2e);
+      border:1px solid rgba(255,255,255,0.07);
+      display:flex; align-items:center; justify-content:center;
+    }
+    .album-art svg { width:22px; height:22px; opacity:.4; }
+    .track-info { flex:1; min-width:0; }
+    .track-name { font-size:.82rem; font-weight:600; color:#fff; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+    .track-sub  { font-size:.67rem; color:rgba(255,255,255,0.3); margin-top:2px; }
+    .vol-icon { display:flex; align-items:center; opacity:.3; }
+    .vol-icon svg { width:18px; height:18px; }
+
+    .prog-row { display:flex; align-items:center; gap:8px; margin-bottom:10px; }
+    .t { font-size:.62rem; font-family:'JetBrains Mono',monospace; color:rgba(255,255,255,0.28); width:28px; }
+    .t.r { text-align:right; }
+    .prog-bar {
+      flex:1; height:3px; background:rgba(255,255,255,0.1);
+      border-radius:2px; position:relative; cursor:pointer;
+    }
+    .prog-fill { height:100%; border-radius:2px; background:#fff; width:0%; }
+    .prog-thumb {
+      position:absolute; right:-4px; top:50%; transform:translateY(-50%);
+      width:9px; height:9px; border-radius:50%; background:#fff; opacity:0;
+      transition:opacity .15s;
+    }
+    .prog-bar:hover .prog-thumb { opacity:1; }
+
+    .controls { display:flex; align-items:center; justify-content:center; gap:22px; }
+    .cb {
+      background:none; border:none; color:rgba(255,255,255,0.4);
+      display:flex; align-items:center; justify-content:center;
+      padding:4px; transition:color .2s, transform .15s;
+    }
+    .cb:hover { color:#fff; transform:scale(1.15); }
+    .cb.play {
+      width:34px; height:34px; border-radius:50%;
+      background:#fff; color:#000;
+    }
+    .cb.play:hover { background:#e0e0e0; transform:scale(1.08); }
+  </style>
+</head>
+<body>
+
+<div id="cur-dot"></div>
+<canvas id="stars-canvas"></canvas>
+<div class="vignette"></div>
+
+<audio id="bgm" loop><source src="bgm.mp4" type="video/mp4"></audio>
+
+<!-- Discord Popup -->
+<div class="popup-overlay" id="disc-overlay">
+  <div class="popup-box">
+    <button class="popup-close" id="disc-close">✕</button>
+    <div class="popup-disc-icon">
+      <svg viewBox="0 0 127.14 96.36" fill="#5865F2">
+        <path d="M107.7 8.07A105.15 105.15 0 0081.47 0a72.06 72.06 0 00-3.36 6.83 97.68 97.68 0 00-29.11 0A72.37 72.37 0 0045.64 0a105.89 105.89 0 00-26.25 8.09C2.79 32.65-1.71 56.6.54 80.21a105.73 105.73 0 0032.17 16.15 77.7 77.7 0 006.89-11.11 68.42 68.42 0 01-10.85-5.18c.91-.66 1.8-1.34 2.66-2a75.57 75.57 0 0064.32 0c.87.71 1.76 1.39 2.66 2a68.68 68.68 0 01-10.87 5.19 77 77 0 006.89 11.1 105.25 105.25 0 0032.19-16.14c2.64-27.38-4.51-51.11-18.9-72.15zM42.45 65.69C36.18 65.69 31 60 31 53s5-12.74 11.43-12.74S54 46 53.89 53s-5.05 12.69-11.44 12.69zm42.24 0C78.41 65.69 73.25 60 73.25 53s5-12.74 11.44-12.74S96.23 46 96.12 53s-5.04 12.69-11.43 12.69z"/>
+      </svg>
+    </div>
+    <div class="popup-label">Discord</div>
+    <div class="popup-user">@3v4g</div>
+    <button class="copy-tag" id="copy-disc">Copy Username</button>
+  </div>
+</div>
+
+<div class="card">
+
+  <!-- Floating weapon -->
+  <div class="weapon-wrap">
+    <svg width="240" height="90" viewBox="0 0 240 90" fill="none" xmlns="http://www.w3.org/2000/svg">
+      <rect x="208" y="34" width="26" height="12" rx="3" fill="rgba(255,255,255,0.3)"/>
+      <rect x="120" y="37" width="90" height="6" rx="3" fill="rgba(255,255,255,0.5)"/>
+      <rect x="70" y="30" width="58" height="18" rx="3.5" fill="rgba(255,255,255,0.55)"/>
+      <rect x="74" y="25" width="48" height="7" rx="2" fill="rgba(255,255,255,0.28)"/>
+      <rect x="85" y="16" width="34" height="12" rx="5" fill="rgba(255,255,255,0.4)"/>
+      <circle cx="102" cy="22" r="3.5" fill="rgba(0,0,0,0.45)" stroke="rgba(255,255,255,0.25)" stroke-width="1"/>
+      <rect x="70" y="48" width="52" height="10" rx="2.5" fill="rgba(255,255,255,0.45)"/>
+      <path d="M100 58 L94 78 Q92 83 96 83 L106 83 Q110 83 110 78 L104 58Z" fill="rgba(255,255,255,0.4)"/>
+      <path d="M96 58 Q82 64 82 74 Q82 80 90 80 L94 80 L94 58Z" fill="none" stroke="rgba(255,255,255,0.25)" stroke-width="1.5"/>
+      <rect x="105" y="58" width="14" height="22" rx="3" fill="rgba(255,255,255,0.32)"/>
+      <path d="M70 32 L36 31 Q24 31 24 40 Q24 49 36 49 L70 48Z" fill="rgba(255,255,255,0.42)"/>
+      <rect x="24" y="38" width="12" height="5" rx="2" fill="rgba(255,255,255,0.22)"/>
+      <rect x="120" y="33" width="6" height="4" rx="1" fill="rgba(255,255,255,0.2)"/>
+      <rect x="196" y="31" width="3" height="8" rx="1" fill="rgba(255,255,255,0.35)"/>
+    </svg>
+  </div>
+
+  <!-- Name -->
+  <div class="name-wrap">
+    <span id="typed-name"></span><span class="blink"></span>
+  </div>
+
+  <!-- Location -->
+  <div class="location">
+    <svg width="9" height="12" viewBox="0 0 9 12" fill="currentColor">
+      <path d="M4.5 0C2.01 0 0 2.01 0 4.5 0 7.875 4.5 12 4.5 12S9 7.875 9 4.5C9 2.01 6.99 0 4.5 0zm0 6.15A1.65 1.65 0 1 1 4.5 2.85a1.65 1.65 0 0 1 0 3.3z"/>
+    </svg>
+    Fort Lauderdale, Florida
+  </div>
+
+  <!-- Icons: Discord + GitHub only -->
+  <div class="icons-row">
+    <!-- Discord -->
+    <div class="icon-pill" id="disc-btn" title="Discord">
+      <svg viewBox="0 0 127.14 96.36" fill="rgba(255,255,255,0.55)">
+        <path d="M107.7 8.07A105.15 105.15 0 0081.47 0a72.06 72.06 0 00-3.36 6.83 97.68 97.68 0 00-29.11 0A72.37 72.37 0 0045.64 0a105.89 105.89 0 00-26.25 8.09C2.79 32.65-1.71 56.6.54 80.21a105.73 105.73 0 0032.17 16.15 77.7 77.7 0 006.89-11.11 68.42 68.42 0 01-10.85-5.18c.91-.66 1.8-1.34 2.66-2a75.57 75.57 0 0064.32 0c.87.71 1.76 1.39 2.66 2a68.68 68.68 0 01-10.87 5.19 77 77 0 006.89 11.1 105.25 105.25 0 0032.19-16.14c2.64-27.38-4.51-51.11-18.9-72.15zM42.45 65.69C36.18 65.69 31 60 31 53s5-12.74 11.43-12.74S54 46 53.89 53s-5.05 12.69-11.44 12.69zm42.24 0C78.41 65.69 73.25 60 73.25 53s5-12.74 11.44-12.74S96.23 46 96.12 53s-5.04 12.69-11.43 12.69z"/>
+      </svg>
+    </div>
+    <!-- GitHub -->
+    <a class="icon-pill" href="https://github.com/3v4g" target="_blank" rel="noopener" title="GitHub">
+      <svg viewBox="0 0 24 24" fill="rgba(255,255,255,0.55)">
+        <path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"/>
+      </svg>
+    </a>
+  </div>
+
+  <!-- Music Player -->
+  <div class="player">
+    <div class="player-top">
+      <div class="album-art">
+        <svg viewBox="0 0 24 24" fill="white">
+          <path d="M12 3v10.55A4 4 0 1 0 14 17V7h4V3h-6z"/>
+        </svg>
+      </div>
+      <div class="track-info">
+        <div class="track-name">praise the lord</div>
+        <div class="track-sub">A$AP ROCKY</div>
+      </div>
+      <div class="vol-icon">
+        <svg viewBox="0 0 24 24" fill="white">
+          <path d="M3 9v6h4l5 5V4L7 9H3zm13.5 3A4.5 4.5 0 0 0 14 7.97v8.05c1.48-.73 2.5-2.25 2.5-4.02zM14 3.23v2.06c2.89.86 5 3.54 5 6.71s-2.11 5.85-5 6.71v2.06c4.01-.91 7-4.49 7-8.77s-2.99-7.86-7-8.77z"/>
+        </svg>
+      </div>
+    </div>
+    <div class="prog-row">
+      <span class="t" id="ct">0:00</span>
+      <div class="prog-bar" id="pb">
+        <div class="prog-fill" id="pf"></div>
+        <div class="prog-thumb"></div>
+      </div>
+      <span class="t r" id="dt">0:00</span>
+    </div>
+    <div class="controls">
+      <button class="cb" id="bprev" title="-10s">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M6 6h2v12H6zm3.5 6 8.5 6V6z"/></svg>
+      </button>
+      <button class="cb play" id="bplay">
+        <svg id="picon" width="15" height="15" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg>
+      </button>
+      <button class="cb" id="bnext" title="+10s">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M6 18l8.5-6L6 6v12zm2.5-6 5.5 4V8z"/><rect x="16" y="6" width="2" height="12"/></svg>
+      </button>
+    </div>
+  </div>
+
+</div>
+
+<script>
+// ── CURSOR (dot only) ──
+const dot = document.getElementById('cur-dot');
+document.addEventListener('mousemove', e => {
+  dot.style.left = e.clientX + 'px';
+  dot.style.top  = e.clientY + 'px';
+});
+
+// ── STARS ──
+const c = document.getElementById('stars-canvas'), ctx = c.getContext('2d');
+let stars = [];
+function initStars() {
+  c.width = innerWidth; c.height = innerHeight; stars = [];
+  for (let i = 0; i < 260; i++)
+    stars.push({ x:Math.random()*c.width, y:Math.random()*c.height, r:Math.random()*1.3+.2, o:Math.random()*.65+.1, t:Math.random()*Math.PI*2, s:Math.random()*.4+.04 });
+}
+initStars(); window.addEventListener('resize', initStars);
+(function drawS() {
+  ctx.clearRect(0,0,c.width,c.height);
+  for (const s of stars) {
+    s.t += s.s * .018;
+    ctx.beginPath(); ctx.arc(s.x,s.y,s.r,0,Math.PI*2);
+    ctx.fillStyle = `rgba(255,255,255,${s.o*(0.5+0.5*Math.sin(s.t))})`; ctx.fill();
+  }
+  requestAnimationFrame(drawS);
+})();
+
+// ── TYPEWRITER ──
+const nameEl = document.getElementById('typed-name');
+const fullName = 'Raymond'; let idx = 0;
+function type() {
+  nameEl.textContent = fullName.slice(0, idx++);
+  if (idx <= fullName.length) setTimeout(type, idx === 1 ? 500 : 95);
+}
+setTimeout(type, 700);
+
+// ── DISCORD POPUP ──
+const overlay = document.getElementById('disc-overlay');
+document.getElementById('disc-btn').addEventListener('click', () => overlay.classList.add('open'));
+document.getElementById('disc-close').addEventListener('click', () => overlay.classList.remove('open'));
+overlay.addEventListener('click', e => { if (e.target === overlay) overlay.classList.remove('open'); });
+const copyBtn = document.getElementById('copy-disc');
+copyBtn.addEventListener('click', () => {
+  const text = '3v4g';
+  const success = () => {
+    copyBtn.textContent = 'Copied!';
+    copyBtn.classList.add('ok');
+    setTimeout(() => { copyBtn.textContent = 'Copy Username'; copyBtn.classList.remove('ok'); }, 2000);
+  };
+  if (navigator.clipboard && window.isSecureContext) {
+    navigator.clipboard.writeText(text).then(success).catch(fallback);
+  } else {
+    fallback();
+  }
+  function fallback() {
+    const ta = document.createElement('textarea');
+    ta.value = text;
+    ta.style.cssText = 'position:fixed;left:-9999px;top:-9999px;opacity:0';
+    document.body.appendChild(ta);
+    ta.focus(); ta.select();
+    document.execCommand('copy');
+    document.body.removeChild(ta);
+    success();
+  }
+});
+
+// ── PLAYER ──
+const audio = document.getElementById('bgm');
+const bplay = document.getElementById('bplay');
+const picon = document.getElementById('picon');
+const pf    = document.getElementById('pf');
+const ct    = document.getElementById('ct');
+const dt    = document.getElementById('dt');
+const pb    = document.getElementById('pb');
+let playing = false;
+const PLAY  = 'M8 5v14l11-7z';
+const PAUSE = 'M6 19h4V5H6v14zm8-14v14h4V5h-4z';
+function fmt(s) { if(isNaN(s)) return '0:00'; const m=Math.floor(s/60),sec=Math.floor(s%60); return `${m}:${sec<10?'0':''}${sec}`; }
+bplay.addEventListener('click', () => {
+  playing ? audio.pause() : audio.play().catch(()=>{});
+  playing = !playing;
+  picon.innerHTML = `<path d="${playing ? PAUSE : PLAY}"/>`;
+});
+audio.addEventListener('timeupdate', () => {
+  if (!audio.duration) return;
+  pf.style.width = (audio.currentTime / audio.duration * 100) + '%';
+  ct.textContent = fmt(audio.currentTime);
+});
+audio.addEventListener('loadedmetadata', () => { dt.textContent = fmt(audio.duration); });
+pb.addEventListener('click', e => {
+  const r = pb.getBoundingClientRect();
+  audio.currentTime = ((e.clientX - r.left) / r.width) * audio.duration;
+});
+document.getElementById('bprev').addEventListener('click', () => { audio.currentTime = Math.max(0, audio.currentTime - 10); });
+document.getElementById('bnext').addEventListener('click', () => { audio.currentTime = Math.min(audio.duration||0, audio.currentTime + 10); });
+</script>
+</body>
+</html>
